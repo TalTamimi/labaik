@@ -7,24 +7,53 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.Message
+import org.apache.commons.math3.stat.regression.SimpleRegression
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.io.ClassPathResource
-import org.springframework.core.io.Resource
-import org.springframework.web.bind.annotation.*
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RestController
+import java.io.File
 import java.io.FileInputStream
-import java.util.*
+import java.time.LocalDateTime
+
+val dimensions = Array(100) { Array(20) { 0 } }
+val indexes = Array(100) { 0 }
+
+fun main(args: Array<String>) {
+    runApplication<HackathonApplication>(*args)
+}
+
+val minLong = 21.278002
+val maxLong = 21.511996
+val minLat = 39.689981
+val maxLat = 39.981805
+
+private fun gridify(long: String, lat: String): String {
+    val x = ((long.toDouble() - minLong) * 10 / (maxLong - minLong)).toInt()
+    val y = ((lat.toDouble() - minLat) * 10 / (maxLat - minLat)).toInt() * 10
+    return (x + y).toString()
+}
+
+private fun ungridify(grid: Int): Pair<Double, Double> {
+    val long = (grid / 10 * (maxLong - minLong)) + minLong
+    val lat = (grid / 10 * (maxLat - minLat)) / 10
+    return Pair(long, lat)
+}
+
+
+private fun String?.slotifiy(): String {
+    val date = this!!
+    val x = LocalDateTime.parse(date.substring(0, date.indexOf('.')))
+    return ((x.dayOfMonth - 2) * 24 + x.hour).toString()
+}
 
 
 @SpringBootApplication
 @RestController
 @Configuration
 class HackathonApplication {
-
 
     @Bean
     fun firebase(): FirebaseApp {
@@ -43,55 +72,82 @@ class HackathonApplication {
         populate(1000)
     }
 
-
-//    fun listenToDb(): ValueEventListener {
-//        val database = FirebaseDatabase.getInstance()
-//        val ref = database.getReference("users")
-//
-//        val users: Map<String, User> =
-//                mapOf("123467" to
-//                        User("talal", "Altamimi", 0,
-//                                3, 0, "Lamda", 0,
-//                                "0558899775", "21.485811", "39.192504799999995")
-//                )
-//
-//        ref.updateChildrenAsync(users)
-//// Attach a listener to read the data at our posts reference
-//        return ref.addValueEventListener(UserEventListener())
-//    }
-
-
-    @PostMapping()
-    fun sendMessage(@PathVariable token:String) {
-
-        val message = Message.builder()
-                .putData("score", "850")
-                .putData("time", "2:45")
-                .setToken(token)
-                .build()
-
-// Send a message to the device corresponding to the provided
-// registration token.
-        val response = FirebaseMessaging.getInstance().send(message)
-// Response is a message ID string.
-        println("Successfully sent message: $response")
+    @Bean
+    fun GenerateReportCsv(): ValueEventListener {
+        val database = FirebaseDatabase.getInstance()
+        val ref = database.getReference("reports")
+        return ref.addValueEventListener(ReportEventListener())
     }
 
 
+    //    @PostMapping()
+//    fun sendMessage(@RequestBody token: String) {
+//        val message = Message.builder()
+//                .setNotification(Notification("hi", "hi"))
+//                .setToken(token)
+//                .build()
+//        FirebaseMessaging.getInstance().send(message)
+//    }
+
+
+    @GetMapping("/indexes")
+    fun getIndexes(): MutableList<Pin> {
+        val pins = mutableListOf<Pin>()
+        for (i in 0 until indexes.size) {
+            if (indexes[i] > 0) {
+                val coordinates = ungridify(i)
+                pins.add(Pin(coordinates.first, coordinates.second, indexes[i]))
+            }
+        }
+        return pins
+    }
+
+    @GetMapping
+    fun modelData(): String {
+        dimensions.forEachIndexed { index, counts -> indexes[index] = train(counts) }
+        return "hello darling"
+    }
+
+    private fun train(counts: Array<Int>): Int {
+        val reg = SimpleRegression()
+        counts
+                .forEachIndexed { index, i -> reg.addData(index + 15.toDouble(), i.toDouble()) }
+
+        return reg.predict(20.0).toInt()
+    }
 }
 
-fun main(args: Array<String>) {
-    runApplication<HackathonApplication>(*args)
-}
-
-class UserEventListener() : ValueEventListener {
+class ReportEventListener : ValueEventListener {
     override fun onCancelled(error: DatabaseError?) {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 
     override fun onDataChange(snapshot: DataSnapshot) {
-        val name = snapshot.getValue(String::class.java)
+        val reports =
+                snapshot.children.asSequence()
+                        .map { it.value as Map<String, String> }
+                        .groupingBy { Pair(gridify(it["latitude"].toString(), it["longitude"].toString()), it["time"].slotifiy()) }
+                        .eachCount()
+        File("reports.csv").printWriter().use { out ->
+            reports.forEach {
+                out.println("${it.key.first},${it.key.second},${it.value}")
+                if (it.key.first.toInt() in 0..100 && it.key.second.toInt() - 20 < 20)
+                    dimensions[it.key.first.toInt()][it.key.second.toInt() - 20] = it.value
+            }
+        }
+
+
     }
 
+    private fun generateCsv(snapshot: DataSnapshot) {
+        val reports = snapshot.children
+        File("reports.csv").printWriter().use { out ->
+            reports.forEach {
+                (it.value as Map<String, String>).let {
+                    out.println("${gridify(it["latitude"].toString(), it["longitude"].toString())}, ${it["type"].toString()}" +
+                            ", ${it["time"].slotifiy()}")
+                }
+            }
+        }
+    }
 }
-

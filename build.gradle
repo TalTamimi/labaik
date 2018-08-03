@@ -49,6 +49,6 @@ dependencies {
     compile("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     compile("org.jetbrains.kotlin:kotlin-reflect")
     compile("com.google.firebase:firebase-admin:6.3.0")
-    compile('com.google.firebase:firebase-core:16.0.0')
+    compile group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
+
 }
-apply plugin: 'com.google.gms.google-services'

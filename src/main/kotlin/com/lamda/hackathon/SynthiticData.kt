@@ -30,7 +30,7 @@ fun getAge() =
         random.nextInt(7)
 
 fun getGender() =
-        random.nextInt(1)
+        random.nextInt(2)
 
 
 fun getPhone() =
@@ -41,6 +41,8 @@ fun getHajjNumber() =
 
 fun getLong() =
         random.nextInt(291824).toFloat() / 1000000 + 39.689981
+fun getLanguage()=
+        random.nextInt(9)
 
 fun getHamla() =
         hamlsa[random.nextInt(7)]
@@ -59,7 +61,7 @@ fun populate(numberOfUsers: Int) {
         users[getHajjNumber()] = User(
                 name.first, name.second, getNationality(), getAge(),
                 getGender(), getHamla(), 0, getPhone(), getLat().toString(),
-                getLong().toString()
+                getLong().toString(), getLanguage()
         )
     }
     val usersToPopulate: Map<String, User> = users

@@ -11,6 +11,7 @@ data class User(
         val phoneNumber: String,
         val latitude: String,
         val longitude: String,
+        val language: Int,
         val travelingWithChild: Boolean = false,
         val travelingWithElder: Boolean = false
         )
