@@ -37,7 +37,7 @@ private fun gridify(long: String, lat: String): String {
 }
 
 private fun ungridify(grid: Int): Pair<Double, Double> {
-    val long = (grid / 10 * (maxLong - minLong)) + minLong
+    val long = (grid % 10 * (maxLong - minLong)) + minLong
     val lat = (grid / 10 * (maxLat - minLat)) / 10
     return Pair(long, lat)
 }
